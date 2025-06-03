@@ -4,23 +4,25 @@ import shap
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelEncoder
-from xgboost import XGBClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 # 加载模型
 try:
-    model = joblib.load('xgb.pkl')
+    model = joblib.load('rf.pkl')
 except FileNotFoundError:
-    st.error("Model file 'xgb.pkl' not found. Please upload the model file.")
+    st.error("Model file 'rf.pkl' not found. Please upload the model file.")
     st.stop()
 
 # 特征范围定义
 feature_names = [
-    "diabetes", "BMXBMI", "RIDRETH1"
+    "Age", "BMI", "Diabetes", "time", "Abdominal"
 ]
 feature_ranges = {
-    "BMXBMI": {"type": "numerical", "min": 25, "max": 100, "default": 25},
-    "diabetes": {"type": "categorical", "options": ["0", "1"]},
-    "RIDRETH1": {"type": "categorical", "options": ["1", "2", "3", "4", "5"]},
+    "Age": {"type": "numerical", "min": 18, "max": 100, "default": 18},
+    "BMI": {"type": "numerical", "min": 10, "max": 100, "default": 10},
+    "Diabetes": {"type": "categorical", "options": ["0", "1"]},
+    "time": {"type": "numerical", "min": 100, "max": 600, "default": 100},
+    "Abdominal": {"type": "categorical", "options": ["0", "1"]},
 }
 
 # Streamlit 界面
@@ -65,23 +67,4 @@ if st.button("Predict"):
 
         # 显示预测结果
         st.subheader("Prediction Result:")
-        st.write(f"Predicted possibility of CVD is **{probability:.2f}%**")
-
-        # 计算 SHAP 值并生成力图
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(features)
-
-        # 绘制 SHAP 力图
-        shap.force_plot(
-            explainer.expected_value,
-            shap_values[0],  # 对第一个样本的 SHAP 值
-            features,
-            matplotlib=True
-        )
-        plt.savefig("shap_force_plot.png", bbox_inches="tight", dpi=300)
-
-        # 在 Streamlit 中显示图片
-        st.image("shap_force_plot.png", caption="SHAP Force Plot", use_column_width=True)
-
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+        st.write(f"Predicted possibility of Early complications is **{probability:.2f}%**")
