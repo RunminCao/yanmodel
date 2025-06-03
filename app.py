@@ -2,7 +2,20 @@ import sys
 import os
 import streamlit as st
 import pandas as pd
-import joblib
+
+# 尝试导入 joblib
+try:
+    import joblib
+except ImportError:
+    st.error("""
+    **Required package 'joblib' is not installed.**
+    
+    Please install it using one of these methods:
+    
+    1. **Local installation**: Run `pip install joblib`
+    2. **Streamlit Cloud**: Add 'joblib' to your requirements.txt file
+    """)
+    st.stop()
 
 # 尝试导入 sklearn
 try:
@@ -85,7 +98,8 @@ with col2:
             options=properties["options"],
             index=0  # 默认选择第一个选项
         )
-        feature_values[feature] = label_encoders[feature].transform([selected])[0]
+        # 直接存储原始值，稍后统一编码
+        feature_values[feature] = selected
     
     # 单独处理 time 特征
     properties = feature_ranges["time"]
@@ -97,11 +111,21 @@ with col2:
         step=5.0
     )
 
+# 转换分类特征为数值
+for feature in ["Diabetes", "Abdominal"]:
+    feature_values[feature] = label_encoders[feature].transform([feature_values[feature]])[0]
+
 # 转换为模型输入格式
 try:
     features_df = pd.DataFrame([feature_values], columns=feature_names)
     st.subheader("Input Summary")
-    st.dataframe(features_df)
+    
+    # 创建更友好的显示版本
+    display_df = features_df.copy()
+    display_df["Diabetes"] = display_df["Diabetes"].map({0: "No", 1: "Yes"})
+    display_df["Abdominal"] = display_df["Abdominal"].map({0: "No", 1: "Yes"})
+    
+    st.dataframe(display_df)
 except Exception as e:
     st.error(f"Error creating input data: {str(e)}")
     st.stop()
@@ -118,30 +142,32 @@ if st.button("Predict Risk", type="primary"):
         # 显示预测结果
         st.subheader("Prediction Result")
         
-        # 使用进度条和指标显示结果
+        # 使用指标显示结果
         st.metric(label="Risk of Early Complications", value=f"{probability:.1f}%")
         
         # 使用颜色编码的风险指示器
         if probability < 30:
             st.success("✅ Low risk: Routine monitoring recommended")
-            color = "green"
+            color = "#4CAF50"  # 绿色
         elif probability < 70:
             st.warning("⚠️ Medium risk: Close monitoring advised")
-            color = "orange"
+            color = "#FFC107"  # 橙色
         else:
             st.error("❗ High risk: Immediate intervention recommended")
-            color = "red"
+            color = "#F44336"  # 红色
         
         # 创建自定义进度条
         progress_html = f"""
-        <div style="margin-top:10px; margin-bottom:20px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
+        <div style="margin:20px 0; padding:10px; background:#f9f9f9; border-radius:10px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:14px;">
+                <span>0% (Low)</span>
+                <span>50% (Medium)</span>
+                <span>100% (High)</span>
             </div>
-            <div style="height:20px; background:#eee; border-radius:10px; overflow:hidden;">
+            <div style="height:25px; background:#eee; border-radius:12px; overflow:hidden; position:relative;">
                 <div style="height:100%; width:{probability}%; background:{color};"></div>
+                <div style="position:absolute; top:0; left:{probability}%; height:100%; width:2px; background:black;"></div>
+                <div style="position:absolute; top:30px; left:{probability}%; transform:translateX(-50%); font-weight:bold; color:{color};">{probability:.1f}%</div>
             </div>
         </div>
         """
@@ -151,41 +177,26 @@ if st.button("Predict Risk", type="primary"):
         st.subheader("Risk Factors Breakdown")
         
         # 创建风险因素解释表
-        risk_table = f"""
-        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
-            <tr style="background-color:#f0f0f0;">
-                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Factor</th>
-                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Your Value</th>
-                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Risk Level</th>
-            </tr>
-            <tr>
-                <td style="border:1px solid #ddd; padding:8px;">Age</td>
-                <td style="border:1px solid #ddd; padding:8px;">{features_df['Age'].iloc[0]}</td>
-                <td style="border:1px solid #ddd; padding:8px;">{'High' if features_df['Age'].iloc[0] > 60 else 'Medium' if features_df['Age'].iloc[0] > 40 else 'Low'}</td>
-            </tr>
-            <tr>
-                <td style="border:1px solid #ddd; padding:8px;">BMI</td>
-                <td style="border:1px solid #ddd; padding:8px;">{features_df['BMI'].iloc[0]}</td>
-                <td style="border:1px solid #ddd; padding:8px;">{'High' if features_df['BMI'].iloc[0] > 30 else 'Medium' if features_df['BMI'].iloc[0] > 25 else 'Low'}</td>
-            </tr>
-            <tr>
-                <td style="border:1px solid #ddd; padding:8px;">Diabetes</td>
-                <td style="border:1px solid #ddd; padding:8px;">{'Yes' if features_df['Diabetes'].iloc[0] == 1 else 'No'}</td>
-                <td style="border:1px solid #ddd; padding:8px;">{'High' if features_df['Diabetes'].iloc[0] == 1 else 'Low'}</td>
-            </tr>
-            <tr>
-                <td style="border:1px solid #ddd; padding:8px;">Procedure Time</td>
-                <td style="border:1px solid #ddd; padding:8px;">{features_df['time'].iloc[0]} minutes</td>
-                <td style="border:1px solid #ddd; padding:8px;">{'High' if features_df['time'].iloc[0] > 300 else 'Medium' if features_df['time'].iloc[0] > 200 else 'Low'}</td>
-            </tr>
-            <tr>
-                <td style="border:1px solid #ddd; padding:8px;">Abdominal Issue</td>
-                <td style="border:1px solid #ddd; padding:8px;">{'Yes' if features_df['Abdominal'].iloc[0] == 1 else 'No'}</td>
-                <td style="border:1px solid #ddd; padding:8px;">{'High' if features_df['Abdominal'].iloc[0] == 1 else 'Low'}</td>
-            </tr>
-        </table>
-        """
-        st.markdown(risk_table, unsafe_allow_html=True)
+        risk_data = {
+            "Factor": ["Age", "BMI", "Diabetes", "Procedure Time", "Abdominal Issue"],
+            "Your Value": [
+                features_df['Age'].iloc[0],
+                features_df['BMI'].iloc[0],
+                "Yes" if features_df['Diabetes'].iloc[0] == 1 else "No",
+                f"{features_df['time'].iloc[0]} minutes",
+                "Yes" if features_df['Abdominal'].iloc[0] == 1 else "No"
+            ],
+            "Risk Level": [
+                "High" if features_df['Age'].iloc[0] > 60 else "Medium" if features_df['Age'].iloc[0] > 40 else "Low",
+                "High" if features_df['BMI'].iloc[0] > 30 else "Medium" if features_df['BMI'].iloc[0] > 25 else "Low",
+                "High" if features_df['Diabetes'].iloc[0] == 1 else "Low",
+                "High" if features_df['time'].iloc[0] > 300 else "Medium" if features_df['time'].iloc[0] > 200 else "Low",
+                "High" if features_df['Abdominal'].iloc[0] == 1 else "Low"
+            ]
+        }
+        
+        # 使用Streamlit原生表格
+        st.table(pd.DataFrame(risk_data))
         
         # 添加临床建议
         st.subheader("Clinical Recommendations")
