@@ -2,8 +2,21 @@ import sys
 import os
 import streamlit as st
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
 import joblib
+
+# 尝试导入 sklearn
+try:
+    from sklearn.preprocessing import LabelEncoder
+except ImportError:
+    st.error("""
+    **Required package 'scikit-learn' is not installed.**
+    
+    Please install it using one of these methods:
+    
+    1. **Local installation**: Run `pip install scikit-learn`
+    2. **Streamlit Cloud**: Add 'scikit-learn' to your requirements.txt file
+    """)
+    st.stop()
 
 # 加载模型
 try:
@@ -108,52 +121,86 @@ if st.button("Predict Risk", type="primary"):
         # 使用进度条和指标显示结果
         st.metric(label="Risk of Early Complications", value=f"{probability:.1f}%")
         
-        # 使用颜色编码的进度条
-        progress_bar = st.progress(0)
+        # 使用颜色编码的风险指示器
         if probability < 30:
+            st.success("✅ Low risk: Routine monitoring recommended")
             color = "green"
-            message = "✅ Low risk: Routine monitoring recommended"
         elif probability < 70:
+            st.warning("⚠️ Medium risk: Close monitoring advised")
             color = "orange"
-            message = "⚠️ Medium risk: Close monitoring advised"
         else:
+            st.error("❗ High risk: Immediate intervention recommended")
             color = "red"
-            message = "❗ High risk: Immediate intervention recommended"
         
-        # 设置进度条颜色
-        progress_bar.progress(int(probability) / 100)
-        
-        # 显示风险信息
-        if color == "green":
-            st.success(message)
-        elif color == "orange":
-            st.warning(message)
-        else:
-            st.error(message)
+        # 创建自定义进度条
+        progress_html = f"""
+        <div style="margin-top:10px; margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+            </div>
+            <div style="height:20px; background:#eee; border-radius:10px; overflow:hidden;">
+                <div style="height:100%; width:{probability}%; background:{color};"></div>
+            </div>
+        </div>
+        """
+        st.markdown(progress_html, unsafe_allow_html=True)
         
         # 添加详细解释
         st.subheader("Risk Factors Breakdown")
         
         # 创建风险因素解释表
-        risk_factors = pd.DataFrame({
-            "Factor": feature_names,
-            "Your Value": features_df.iloc[0].values,
-            "Contribution": "To be determined"  # 这里可以添加实际的影响分析
-        })
-        
-        st.table(risk_factors)
+        risk_table = f"""
+        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+            <tr style="background-color:#f0f0f0;">
+                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Factor</th>
+                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Your Value</th>
+                <th style="border:1px solid #ddd; padding:8px; text-align:left;">Risk Level</th>
+            </tr>
+            <tr>
+                <td style="border:1px solid #ddd; padding:8px;">Age</td>
+                <td style="border:1px solid #ddd; padding:8px;">{features_df['Age'].iloc[0]}</td>
+                <td style="border:1px solid #ddd; padding:8px;">{'High' if features_df['Age'].iloc[0] > 60 else 'Medium' if features_df['Age'].iloc[0] > 40 else 'Low'}</td>
+            </tr>
+            <tr>
+                <td style="border:1px solid #ddd; padding:8px;">BMI</td>
+                <td style="border:1px solid #ddd; padding:8px;">{features_df['BMI'].iloc[0]}</td>
+                <td style="border:1px solid #ddd; padding:8px;">{'High' if features_df['BMI'].iloc[0] > 30 else 'Medium' if features_df['BMI'].iloc[0] > 25 else 'Low'}</td>
+            </tr>
+            <tr>
+                <td style="border:1px solid #ddd; padding:8px;">Diabetes</td>
+                <td style="border:1px solid #ddd; padding:8px;">{'Yes' if features_df['Diabetes'].iloc[0] == 1 else 'No'}</td>
+                <td style="border:1px solid #ddd; padding:8px;">{'High' if features_df['Diabetes'].iloc[0] == 1 else 'Low'}</td>
+            </tr>
+            <tr>
+                <td style="border:1px solid #ddd; padding:8px;">Procedure Time</td>
+                <td style="border:1px solid #ddd; padding:8px;">{features_df['time'].iloc[0]} minutes</td>
+                <td style="border:1px solid #ddd; padding:8px;">{'High' if features_df['time'].iloc[0] > 300 else 'Medium' if features_df['time'].iloc[0] > 200 else 'Low'}</td>
+            </tr>
+            <tr>
+                <td style="border:1px solid #ddd; padding:8px;">Abdominal Issue</td>
+                <td style="border:1px solid #ddd; padding:8px;">{'Yes' if features_df['Abdominal'].iloc[0] == 1 else 'No'}</td>
+                <td style="border:1px solid #ddd; padding:8px;">{'High' if features_df['Abdominal'].iloc[0] == 1 else 'Low'}</td>
+            </tr>
+        </table>
+        """
+        st.markdown(risk_table, unsafe_allow_html=True)
         
         # 添加临床建议
         st.subheader("Clinical Recommendations")
         if probability < 30:
+            st.info("**Low Risk Protocol:**")
             st.info("- Continue regular follow-up visits")
             st.info("- Maintain healthy lifestyle habits")
             st.info("- Annual check-up recommended")
         elif probability < 70:
+            st.warning("**Medium Risk Protocol:**")
             st.warning("- Schedule follow-up within 1 month")
             st.warning("- Consider additional diagnostic tests")
             st.warning("- Monitor for symptoms closely")
         else:
+            st.error("**High Risk Protocol:**")
             st.error("- Seek immediate medical consultation")
             st.error("- Consider hospitalization for observation")
             st.error("- Perform comprehensive diagnostic evaluation")
