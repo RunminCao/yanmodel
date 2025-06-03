@@ -4,7 +4,6 @@ import shap
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelEncoder
-from sklearn.ensemble import RandomForestClassifier
 
 # 加载模型
 try:
