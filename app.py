@@ -68,3 +68,6 @@ if st.button("Predict"):
         # 显示预测结果
         st.subheader("Prediction Result:")
         st.write(f"Predicted possibility of Early complications is **{probability:.2f}%**")
+    # 添加必需的 except 块
+    except Exception as e:
+        st.error(f"预测过程中出错: {str(e)}")
