@@ -1,5 +1,3 @@
-pip install joblib
-pip install scikit-learn
 import sys
 import os
 import streamlit as st
