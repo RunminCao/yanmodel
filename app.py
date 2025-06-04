@@ -1,7 +1,10 @@
+import matplotlib.pyplot as plt
 import sys
 import os
 import streamlit as st
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+import joblib
  
 # 尝试导入 joblib
 try:
